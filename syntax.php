@@ -29,8 +29,8 @@ require_once(DOKU_PLUGIN.'syntax.php');
  */
 class syntax_plugin_box2 extends DokuWiki_Syntax_Plugin {
 
-    var $title_mode = false;
-    var $box_content = false;
+    var $title_mode = array();
+    var $box_content = array();
 
     // the following are used in rendering and are set by _xhtml_boxopen()
     var $_xb_colours      = array();
@@ -67,6 +67,14 @@ class syntax_plugin_box2 extends DokuWiki_Syntax_Plugin {
         $this->Lexer->addExitPattern('</box.*?>', 'plugin_box2');
     }
 
+    private function isTitleMode() {
+        return $this->title_mode[count($this->title_mode)-1];
+    }
+
+    private function isBoxContent() {
+        return $this->box_content[count($this->box_content)-1];
+    }
+
     /**
      * Handle the match
      */
@@ -76,22 +84,22 @@ class syntax_plugin_box2 extends DokuWiki_Syntax_Plugin {
             case DOKU_LEXER_ENTER:
                 $data = $this->_boxstyle(trim(substr($match, 4, -1)));
                 if (substr($match, -1) == '|') {
-                    $this->title_mode = true;
+                    $this->title_mode[] = true;
                     return array('title_open',$data, $pos);
                 } else {
                     return array('box_open',$data, $pos);
                 }
 
             case DOKU_LEXER_MATCHED:
-                if ($this->title_mode) {
-                    $this->title_mode = false;
+                if ($this->isTitleMode()) {
+                    array_pop( $this->title_mode );
                     return array('box_open','', $pos);
                 } else {
                     return array('data', $match, $pos);
                 }
 
             case DOKU_LEXER_UNMATCHED:
-                if ($this->title_mode) {
+                if ($this->isTitleMode()) {
                     return array('title', $match, $pos);
                 }
 
@@ -121,21 +129,21 @@ class syntax_plugin_box2 extends DokuWiki_Syntax_Plugin {
         if($mode == 'xhtml'){
             switch ($instr) {
                 case 'title_open' :
-                    $this->title_mode = true;
+                    $this->title_mode[] = true;
                     $renderer->doc .= $this->_xhtml_boxopen($renderer, $pos, $data);
                     $renderer->doc .= '<h2 class="box_title"' . $this->_title_colours . '>';
                     break;
 
                 case 'box_open' :
-                    if ($this->title_mode) {
-                        $this->title_mode = false;
-                        $this->box_content = true;
+                    if ($this->isTitleMode()) {
+                        array_pop( $this->title_mode );
+                        $this->box_content[] = true;
                         $renderer->doc .= "</h2>\n<div class=\"box_content\"" . $this->_content_colours . '>';
                     } else {
                         $renderer->doc .= $this->_xhtml_boxopen($renderer, $pos, $data);
                         
                         if ( strlen( $this->_content_colours ) > 0 ) {
-	                        $this->box_content = true;
+	                        $this->box_content[] = true;
 							$renderer->doc .= '<div class="box_content"' . $this->_content_colours . '>';
 						}
                     }
@@ -145,7 +153,7 @@ class syntax_plugin_box2 extends DokuWiki_Syntax_Plugin {
                 case 'data' :
                     $output = $renderer->_xmlEntities($data);
 
-                    if ( $this->title_mode ) {
+                    if ( $this->isTitleMode() ) {
                         $hid = $renderer->_headerToLink($output,true);
                         $renderer->doc .= '<a id="' . $hid . '" name="' . $hid . '">' . $output . '</a>';
                         break;
@@ -155,8 +163,8 @@ class syntax_plugin_box2 extends DokuWiki_Syntax_Plugin {
                     break;
 
                 case 'box_close' :
-					if ( $this->box_content ) {
-                        $this->box_content = false;
+					if ( $this->isBoxContent() ) {
+                        array_pop( $this->box_content );
 	                    $renderer->doc .= "</div>\n";
 					}
 
